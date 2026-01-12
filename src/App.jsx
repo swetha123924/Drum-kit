@@ -1,4 +1,5 @@
-import { useState,useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import './App.css';
 import bassImage from './photos/bass.png';
 import floorImage from './photos/floor drum.jpg';
 import hihatImage from './photos/hiphat.jpg';
@@ -90,69 +91,122 @@ const sounds = {
   },
 };
 
-const padColors = {
-  bass: 'bg-red-500',
-  snare: 'bg-blue-500',
-  floor: 'bg-green-500',
-  hiHat: 'bg-purple-500',
-  lowDrum: 'bg-orange-500',
-  highDrum: 'bg-pink-500',
-  crash: 'bg-teal-500',
-  ride: 'bg-yellow-500',
+const pads = [
+  { id: 'crash', label: 'Crash', key: 'J', positionClass: 'pos-crash' },
+  { id: 'ride', label: 'Ride', key: 'K', positionClass: 'pos-ride' },
+  { id: 'hiHat', label: 'Hi-Hat', key: 'F', positionClass: 'pos-hihat' },
+  { id: 'snare', label: 'Snare', key: 'S', positionClass: 'pos-snare' },
+  { id: 'highDrum', label: 'High Tom', key: 'H', positionClass: 'pos-high' },
+  { id: 'lowDrum', label: 'Low Tom', key: 'G', positionClass: 'pos-low' },
+  { id: 'floor', label: 'Floor Tom', key: 'D', positionClass: 'pos-floor' },
+  { id: 'bass', label: 'Kick', key: 'A', positionClass: 'pos-kick' },
+];
+
+const kitCopy = {
+  rock: 'Punchy, roomy rock kit with forward kick and crisp cymbals.',
+  jazz: 'Warm, dynamic jazz kit that stays articulate at softer touches.',
+  electronic: 'Clean electronic kit with fast transients and deep low end.',
 };
 
-const keyMap = {
-  'a': 'bass',
-  's': 'snare',
-  'd': 'floor',
-  'f': 'hiHat',
-  'g': 'lowDrum',
-  'h': 'highDrum',
-  'j': 'crash',
-  'k': 'ride',
-};
 function App() {
   const [currentKit, setCurrentKit] = useState('rock');
   const [activePad, setActivePad] = useState(null);
 
-  const playSound = (pad) => {
-    const audio = new Audio(sounds[currentKit][pad]);
-    audio.play();
-    setActivePad(pad);
-    setTimeout(() => setActivePad(null), 200); 
-  };
+  const keyMap = useMemo(() => (
+    pads.reduce((map, pad) => {
+      map[pad.key.toLowerCase()] = pad.id;
+      return map;
+    }, {})
+  ), []);
 
-  const handleKeyDown = (event) => {
-    const pad = keyMap[event.key];
-    if (pad) {
-      playSound(pad);
-    }
-  };
+  const playSound = useCallback((padId) => {
+    const audio = new Audio(sounds[currentKit][padId]);
+    audio.currentTime = 0;
+    audio.play();
+    setActivePad(padId);
+    setTimeout(() => setActivePad(null), 180);
+  }, [currentKit]);
 
   useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
+    const handleKeyDown = (event) => {
+      const padId = keyMap[event.key.toLowerCase()];
+      if (!padId) return;
+      event.preventDefault();
+      playSound(padId);
     };
-  }, []);
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [keyMap, playSound]);
 
   return (
-    <div className="flex flex-col items-center justify-center bg-gray-800 text-white min-h-screen">
-      <header className="text-center mb-8">
-        <h1 className="text-4xl font-bold text-yellow-400">Roland OCTAPAD</h1>
+    <div className="app-shell">
+      <header className="hero">
+        <div className="eyebrow">Responsive | Playable | Realistic</div>
+        <h1>Roland OCTAPAD Studio</h1>
+        <p>Tap the pads, use your keyboard, and flip between acoustic and electronic kits that sit like a real drum set.</p>
       </header>
-      <div className="flex flex-wrap justify-center space-x-4 mb-4">
-        <button className="bg-blue-600 p-2 rounded hover:bg-gray-500 hover:cursor-pointer" onClick={() => setCurrentKit('rock')}>ROCK</button>
-        <button className="bg-green-600 p-2 rounded hover:bg-gray-500 hover:cursor-pointer" onClick={() => setCurrentKit('jazz')}>JAZZ</button>
-        <button className="bg-pink-600 p-2 rounded hover:bg-gray-500 hover:cursor-pointer" onClick={() => setCurrentKit('electronic')}>ELECT</button>
-      </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4">
-        {['bass', 'snare', 'floor', 'hiHat', 'lowDrum', 'highDrum', 'crash', 'ride'].map(pad => (
-          <div key={pad} className={`h-[20vh] sm:h-[300px] p-4 rounded-md border-2 border-gray-600 transition hover:cursor-pointer hover:shadow-lg ${activePad === pad ? padColors[pad] : 'bg-gray-700'}`} onClick={() => playSound(pad)}>
-            <img src={images[currentKit][pad]} alt={pad} className="w-full h-full object-fill rounded-md" />
-          </div>
+
+      <div className="kit-switcher" role="group" aria-label="Drum kit selector">
+        {['rock', 'jazz', 'electronic'].map((kit) => (
+          <button
+            key={kit}
+            className={`kit-chip ${currentKit === kit ? 'is-active' : ''}`}
+            onClick={() => setCurrentKit(kit)}
+          >
+            {kit.toUpperCase()}
+          </button>
         ))}
       </div>
+
+      <section className="content">
+        <div className="drum-stage" aria-label={`${currentKit} drum kit`}>
+          <div className="stage-glow" aria-hidden="true" />
+          <div className="drum-grid">
+            {pads.map((pad) => (
+              <button
+                key={pad.id}
+                className={`drum-pad ${pad.positionClass} ${activePad === pad.id ? 'is-active' : ''}`}
+                onClick={() => playSound(pad.id)}
+                aria-label={`${pad.label} pad (${pad.key})`}
+              >
+                <div className="pad-face">
+                  <img src={images[currentKit][pad.id]} alt={pad.label} loading="lazy" />
+                  <div className="pad-overlay" />
+                  <div className="pad-info">
+                    <span className="keycap">{pad.key}</span>
+                    <span className="label">{pad.label}</span>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <aside className="side-panel">
+          <div className="card">
+            <p className="card-title">Current kit</p>
+            <h3>{currentKit.toUpperCase()}</h3>
+            <p className="muted">{kitCopy[currentKit]}</p>
+            <div className="pill-row">
+              <span className="pill">Tap or click</span>
+              <span className="pill">Keyboard-ready</span>
+              <span className="pill">Responsive layout</span>
+            </div>
+          </div>
+          <div className="card">
+            <p className="card-title">Keyboard map</p>
+            <div className="hotkey-grid">
+              {pads.map((pad) => (
+                <div key={pad.id} className="hotkey">
+                  <span className="keycap small">{pad.key}</span>
+                  <span>{pad.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </aside>
+      </section>
     </div>
   );
 }
